@@ -7,15 +7,26 @@ below, not necessarily the last one; add a **Later reversed:** line to whichever
 
 ## Decision 1
 
-- **Chose:**
-- **Rejected:**
-- **Why:**
+* **Chose:**
+  ChatGPT for documentation, initial schema design, debugging, and boilerplate code generation.
+
+* **Rejected:**
+  Gemini CLI for documentation, initial schema design, and conceptual discussions.
+
+* **Why:**
+  ChatGPT provided better support for understanding requirements, designing the initial database schema, explaining technical concepts, and debugging issues interactively. However, using a chatbot for large-scale implementation required repeatedly copying and pasting generated code into the project, which became time-consuming and increased the chances of integration errors.
 
 ## Decision 2
 
-- **Chose:**
-- **Rejected:**
-- **Why:**
+* **Chose:**
+  Gemini CLI for code generation and implementation.
+
+* **Rejected:**
+  ChatGPT as the primary tool for direct codebase implementation.
+
+* **Why:**
+  Gemini CLI can work directly within the project repository, allowing it to inspect the existing codebase, understand the project structure, create and modify multiple files, and make changes without repeatedly copying and pasting code between the chatbot and IDE. This makes it more efficient for implementing larger features and maintaining consistency with the existing codebase. It can also work with the project's existing files and configuration while developing features incrementally.
+
 
 ## Decision 3
 
