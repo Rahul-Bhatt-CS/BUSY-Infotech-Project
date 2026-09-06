@@ -8,6 +8,7 @@ import com.BUSY.learnWithUs.Entity.User;
 import com.BUSY.learnWithUs.Repository.UserRepository;
 import com.BUSY.learnWithUs.Security.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -74,5 +75,14 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .build();
+    }
+
+    public User current(String email) {
+        return userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new AccessDeniedException("User not found"));
+    }
+
+    public UserResponse user(User u) {
+        return new UserResponse(u.getId(), u.getEmail(), u.getRole());
     }
 }
