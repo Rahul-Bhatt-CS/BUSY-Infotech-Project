@@ -2,18 +2,22 @@ package com.BUSY.learnWithUs.Service;
 
 import com.BUSY.learnWithUs.Dto.Lesson.LessonRequest;
 import com.BUSY.learnWithUs.Dto.Lesson.LessonView;
-import com.BUSY.learnWithUs.Entity.Course;
-import com.BUSY.learnWithUs.Entity.Lesson;
-import com.BUSY.learnWithUs.Entity.User;
+import com.BUSY.learnWithUs.Entity.*;
 import com.BUSY.learnWithUs.Repository.*;
 import com.BUSY.learnWithUs.Security.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -51,12 +55,18 @@ public class LessonService {
 
         l.setCourse(c);
         l.setTitle(r.title().trim());
-        l.content = r.content();
-        l.position = r.position() == null
-                ? (int) lessons.countByCourseId(courseId) + 1
-                : r.position();
+        l.setContent(r.content());
+        if(r.position() == null){
+            l.setPosition((int) lessons.countByCourseId(courseId) + 1);
+        }else{
+            l.setPosition(r.position());
+        }
 
-        if (l.position < 1) {
+//        l.position = r.position() == null
+//                ? (int) lessons.countByCourseId(courseId) + 1
+//                : r.position();
+
+        if (l.getPosition() < 1) {
             throw new IllegalArgumentException(
                     "Position must be positive"
             );
@@ -64,7 +74,7 @@ public class LessonService {
 
         shiftForInsert(
                 courseId,
-                l.position,
+                l.getPosition(),
                 null
         );
 
@@ -84,10 +94,10 @@ public class LessonService {
                         () -> new EntityNotFoundException("Lesson not found")
                 );
 
-        assertOwner(u, l.course);
+        assertOwner(u, l.getCourse());
         validateLesson(r);
 
-        int old = l.position;
+        int old = l.getPosition();
         int np = r.position() == null
                 ? old
                 : r.position();
@@ -101,7 +111,7 @@ public class LessonService {
         if (np != old) {
             List<Lesson> ls =
                     lessons.findByCourseIdOrderByPositionAsc(
-                            l.course.id
+                            l.getCourse().getId()
                     );
 
             if (np > ls.size()) {
@@ -110,19 +120,19 @@ public class LessonService {
 
             for (Lesson x : ls) {
                 if (
-                        !x.id.equals(id)
-                                && x.position >= Math.min(old, np)
-                                && x.position <= Math.max(old, np)
+                        !x.getId().equals(id)
+                                && x.getPosition() >= Math.min(old, np)
+                                && x.getPosition() <= Math.max(old, np)
                 ) {
-                    x.position += old > np ? 1 : -1;
+                    x.setPosition(x.getPosition() + old > np ? 1 : -1);
                 }
             }
         }
 
-        l.title = r.title().trim();
-        l.content = r.content();
-        l.position = np;
-        l.updatedAt = Instant.now();
+        l.setTitle(r.title().trim());
+        l.setContent(r.content());
+        l.setPosition(np);
+        l.setUpdatedAt(LocalDateTime.now());
 
         lessons.save(l);
 
@@ -153,7 +163,7 @@ public class LessonService {
     private void assertOwner(User u, Course c) {
         instructor(u);
 
-        if (!c.instructor.id.equals(u.id)) {
+        if (!c.getInstructor().getId().equals(u.getId())) {
             throw new AccessDeniedException(
                     "Only the course instructor can manage lessons"
             );
@@ -170,10 +180,10 @@ public class LessonService {
 
         for (Lesson x : ls) {
             if (
-                    !Objects.equals(x.id, ignore)
-                            && x.position >= pos
+                    !Objects.equals(x.getId(), ignore)
+                            && x.getPosition() >= pos
             ) {
-                x.position++;
+                x.setPosition(x.getPosition() + 1);
             }
         }
     }
@@ -188,20 +198,20 @@ public class LessonService {
                         () -> new EntityNotFoundException("Lesson not found")
                 );
 
-        assertOwner(u, l.course);
+        assertOwner(u, l.getCourse());
 
-        int old = l.position;
+        int old = l.getPosition();
 
         lessons.delete(l);
 
         for (
                 Lesson x :
                 lessons.findByCourseIdOrderByPositionAsc(
-                        l.course.id
+                        l.getCourse().getId()
                 )
         ) {
-            if (x.position > old) {
-                x.position--;
+            if (x.getPosition() > old) {
+                x.setPosition(x.getPosition() - 1);
             }
         }
     }
@@ -223,7 +233,7 @@ public class LessonService {
                 ls.size() != ids.size()
                         || new HashSet<>(ids).size() != ls.size()
                         || !ls.stream()
-                        .map(x -> x.id)
+                        .map(x -> x.getId())
                         .collect(Collectors.toSet())
                         .equals(new HashSet<>(ids))
         ) {
@@ -236,13 +246,13 @@ public class LessonService {
                 ls.stream()
                         .collect(
                                 Collectors.toMap(
-                                        x -> x.id,
+                                        x -> x.getId(),
                                         x -> x
                                 )
                         );
 
         for (int i = 0; i < ids.size(); i++) {
-            m.get(ids.get(i)).position = i + 1;
+            m.get(ids.get(i)).setPosition(i+1);
         }
 
         lessons.saveAll(ls);
@@ -269,17 +279,17 @@ public class LessonService {
     }
 
     private void instructor(User u) {
-        if (u.role != Role.INSTRUCTOR) {
+        if (u.getRole() != UserRole.INSTRUCTOR) {
             throw new AccessDeniedException("Instructor access required");
         }
     }
 
     private void canAccess(User u, Course c) {
-        if (u.role == Role.INSTRUCTOR) {
+        if (u.getRole() == UserRole.INSTRUCTOR) {
             return;
         }
 
-        if (c.status != CourseStatus.PUBLISHED) {
+        if (c.getStatus() != CourseStatus.PUBLISHED) {
             throw new AccessDeniedException("Course is not accessible");
         }
     }
