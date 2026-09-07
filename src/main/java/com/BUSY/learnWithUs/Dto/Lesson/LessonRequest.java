@@ -1,4 +1,9 @@
 package com.BUSY.learnWithUs.Dto.Lesson;
 
-public class LessonRequest {
+
+public record LessonRequest(
+        String title,
+        String content,
+        Integer position
+) {
 }

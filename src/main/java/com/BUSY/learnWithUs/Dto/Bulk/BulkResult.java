@@ -1,4 +1,7 @@
 package com.BUSY.learnWithUs.Dto.Bulk;
 
-public class BulkResult {
+public record BulkResult(
+        String email,
+        String result
+) {
 }

@@ -1,4 +1,10 @@
 package com.BUSY.learnWithUs.Dto.Lesson;
 
-public class LessonView {
+
+public record LessonView(
+        Long id,
+        String title,
+        String content,
+        Integer position
+) {
 }

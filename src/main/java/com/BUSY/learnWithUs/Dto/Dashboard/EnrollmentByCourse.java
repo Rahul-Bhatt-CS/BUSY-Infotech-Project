@@ -1,4 +1,9 @@
 package com.BUSY.learnWithUs.Dto.Dashboard;
 
-public class EnrollmentByCourse {
+
+public record EnrollmentByCourse(
+        Long courseId,
+        String courseTitle,
+        long enrollmentCount
+) {
 }

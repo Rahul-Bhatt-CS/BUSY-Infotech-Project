@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface InactivityAlertRepository extends JpaRepository<InactivityAlert, Long> {
-    List<InactivityAlert> findByDismissedAtIsNull();
-    Optional<InactivityAlert> findByEnrollmentAndDismissedAtIsNull(Enrollment enrollment);
+    List<InactivityAlert> findByDismissedAtIsNullOrderByTriggeredAtAsc();
+    Optional<InactivityAlert> findFirstByEnrollmentIdAndDismissedAtIsNull(Long enrollmentId);
+    long countByDismissedAtIsNull();
 }

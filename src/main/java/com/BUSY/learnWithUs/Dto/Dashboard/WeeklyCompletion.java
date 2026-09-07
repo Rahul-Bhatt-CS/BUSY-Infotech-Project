@@ -1,4 +1,7 @@
 package com.BUSY.learnWithUs.Dto.Dashboard;
 
-public class WeeklyCompletion {
+public record WeeklyCompletion(
+        String week,
+        long completions
+) {
 }

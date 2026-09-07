@@ -1,4 +1,6 @@
 package com.BUSY.learnWithUs.Dto.Activity;
 
-public class CommentRequest {
+public record CommentRequest(
+        String comment
+) {
 }

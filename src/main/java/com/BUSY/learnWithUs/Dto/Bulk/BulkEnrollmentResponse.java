@@ -1,4 +1,8 @@
 package com.BUSY.learnWithUs.Dto.Bulk;
 
-public class BulkEnrollmentResponse {
+import java.util.List;
+
+public record BulkEnrollmentResponse(
+        List<BulkResult> results
+) {
 }
