@@ -6,6 +6,7 @@ import com.BUSY.learnWithUs.Entity.User;
 import com.BUSY.learnWithUs.Service.AuthService;
 import com.BUSY.learnWithUs.Service.BulkEnrollmentService;
 import lombok.AllArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,7 +28,7 @@ public class BulkEnrollmentController {
         );
     }
 
-
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses/{id}/enrollments/bulk")
     public List<BulkResult> bulk(
             @PathVariable Long id,

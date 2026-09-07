@@ -152,3 +152,41 @@ It defined:
 ### What you corrected
 
 first developing backend then will start with the frontend review and implementation
+
+---
+
+## What you were trying to achieve
+
+The next prompt was used to define the complete UI/UX behavior and implementing the frontend.
+
+### Prompt
+
+> Using the BRD, PRD, README, approved architecture, database schema, API specification and UI/UX specification, initialize the project and implement it incrementally. Do not make architectural decisions without documenting them.
+
+### What you got
+
+The AI produced `docs/ui-ux-spec.md`.
+
+It defined:
+
+* Authentication screen.
+* Instructor dashboard.
+* Course catalogue.
+* My Courses.
+* Course learning view.
+* Course creation/editing.
+* Course management.
+* Lesson management.
+* Single and bulk enrollment.
+* Learner progress view.
+* Activity history.
+* Inactivity alerts.
+* Role-specific navigation.
+* Forms, tables, filters, sorting, pagination.
+* Loading, empty, error, and success states.
+* Navigation flows.
+* UI-level security behavior.
+
+### What you corrected
+
+first developing backend then will start with the frontend review and implementation

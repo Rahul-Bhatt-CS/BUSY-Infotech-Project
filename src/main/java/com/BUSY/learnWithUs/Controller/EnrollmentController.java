@@ -8,6 +8,7 @@ import com.BUSY.learnWithUs.Entity.UserRole;
 import com.BUSY.learnWithUs.Service.AuthService;
 import com.BUSY.learnWithUs.Service.EnrollmentService;
 import lombok.AllArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,7 @@ public class EnrollmentController {
         );
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses/{id}/enrollments")
     public EnrollmentView enroll(
             @PathVariable Long id,
@@ -47,7 +49,7 @@ public class EnrollmentController {
         return enrollmentService.myEnrollments(me());
     }
 
-
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @GetMapping("/courses/{id}/enrollments")
     public List<EnrollmentView> courseEnrollments(
             @PathVariable Long id

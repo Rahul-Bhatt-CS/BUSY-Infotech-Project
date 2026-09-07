@@ -8,6 +8,7 @@ import com.BUSY.learnWithUs.Entity.User;
 import com.BUSY.learnWithUs.Service.AuthService;
 import com.BUSY.learnWithUs.Service.CourseService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -55,11 +56,13 @@ public class CourseController {
         return courseService.getCourse(me(), id);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses")
     public CourseView create(@RequestBody CourseRequest r) {
         return courseService.create(me(), r);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PutMapping("/courses/{id}")
     public CourseView update(
             @PathVariable Long id,
@@ -70,16 +73,19 @@ public class CourseController {
 
     // ==================== Course Lifecycle ====================
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses/{id}/publish")
     public CourseView publish(@PathVariable Long id) {
         return courseService.transition(me(), id, CourseStatus.PUBLISHED);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses/{id}/archive")
     public CourseView archive(@PathVariable Long id) {
         return courseService.transition(me(), id, CourseStatus.ARCHIVED);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses/{id}/restore")
     public CourseView restore(@PathVariable Long id) {
         return courseService.transition(me(), id, CourseStatus.DRAFT);

@@ -6,6 +6,7 @@ import com.BUSY.learnWithUs.Service.CourseExportService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,7 @@ public class CourseExportController {
         );
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @GetMapping(
             value = "/courses/{id}/progress/export",
             produces = "text/csv"

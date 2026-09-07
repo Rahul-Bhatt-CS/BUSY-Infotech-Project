@@ -6,6 +6,7 @@ import com.BUSY.learnWithUs.Service.AuthService;
 import com.BUSY.learnWithUs.Service.InactivityAlertService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,16 +29,19 @@ public class InactivityAlertController {
         );
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @GetMapping("/inactivity-alerts")
     public List<AlertView> alerts() {
         return inactivityAlertService.alerts(me());
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @GetMapping("/inactivity-alerts/count")
     public Map<String, Long> alertCount() {
         return Map.of("count", inactivityAlertService.alertCount(me()));
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/inactivity-alerts/{id}/dismiss")
     public ResponseEntity<Void> dismiss(@PathVariable Long id) {
         inactivityAlertService.dismissAlert(me(), id);

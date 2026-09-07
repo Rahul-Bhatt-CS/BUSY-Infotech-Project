@@ -8,6 +8,7 @@ import com.BUSY.learnWithUs.Service.AuthService;
 import com.BUSY.learnWithUs.Service.LessonService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +35,7 @@ public class LessonController {
         return lessonService.getLessons(me(), id);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PostMapping("/courses/{id}/lessons")
     public LessonView addLesson(
             @PathVariable Long id,
@@ -42,6 +44,7 @@ public class LessonController {
         return lessonService.addLesson(me(), id, r);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PutMapping("/lessons/{id}")
     public LessonView updateLesson(
             @PathVariable Long id,
@@ -50,6 +53,7 @@ public class LessonController {
         return lessonService.updateLesson(me(), id, r);
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @DeleteMapping("/lessons/{id}")
     public ResponseEntity<Void> deleteLesson(
             @PathVariable Long id
@@ -59,6 +63,7 @@ public class LessonController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasRole('INSTRUCTOR')")
     @PutMapping("/courses/{id}/lessons/reorder")
     public ResponseEntity<Void> reorder(
             @PathVariable Long id,
