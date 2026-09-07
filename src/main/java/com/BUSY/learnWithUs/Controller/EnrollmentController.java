@@ -47,19 +47,6 @@ public class EnrollmentController {
         return enrollmentService.myEnrollments(me());
     }
 
-    @GetMapping("/users/learners")
-    public List<UserResponse> learners() {
-        if (me().getRole() != UserRole.INSTRUCTOR) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Instructor access required"
-            );
-        }
-
-        return enrollmentService.learners()
-                .stream()
-                .map(enrollmentService::user)
-                .toList();
-    }
 
     @GetMapping("/courses/{id}/enrollments")
     public List<EnrollmentView> courseEnrollments(

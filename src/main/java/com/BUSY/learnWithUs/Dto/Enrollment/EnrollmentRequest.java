@@ -1,4 +1,6 @@
 package com.BUSY.learnWithUs.Dto.Enrollment;
 
-public class EnrollmentRequest {
+public record EnrollmentRequest(
+        Long learnerId
+) {
 }

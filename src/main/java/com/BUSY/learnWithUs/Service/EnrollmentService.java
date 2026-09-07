@@ -149,10 +149,6 @@ public class EnrollmentService {
         );
     }
 
-    public List<User> learners() {
-        return users.findByRoleOrderByEmailAsc(UserRole.LEARNER);
-    }
-
     public List<EnrollmentView> myEnrollments(User learner) {
         return enrollments
                 .findByLearnerIdOrderByEnrolledAtDesc(learner.getId())

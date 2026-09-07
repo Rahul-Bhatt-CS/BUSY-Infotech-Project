@@ -1,11 +1,9 @@
 package com.BUSY.learnWithUs.Service;
 
 import com.BUSY.learnWithUs.Dto.Activity.ActivityView;
+import com.BUSY.learnWithUs.Dto.Activity.CommentRequest;
 import com.BUSY.learnWithUs.Dto.Auth.UserResponse;
-import com.BUSY.learnWithUs.Entity.Course;
-import com.BUSY.learnWithUs.Entity.CourseStatus;
-import com.BUSY.learnWithUs.Entity.User;
-import com.BUSY.learnWithUs.Entity.UserRole;
+import com.BUSY.learnWithUs.Entity.*;
 import com.BUSY.learnWithUs.Repository.*;
 import com.BUSY.learnWithUs.Security.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -13,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -71,6 +70,45 @@ public class ActivityService {
                 )
                 .toList();
     }
+
+    @Transactional
+    public ActivityView comment(
+            User u,
+            Long cid,
+            CommentRequest r
+    ) {
+        Course c = requireCourse(cid);
+
+        canAccess(u, c);
+
+        if (
+                r == null
+                        || r.comment() == null
+                        || r.comment().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "Comment is required"
+            );
+        }
+
+        ActivityLog a = new ActivityLog();
+
+        a.setCourse(c);
+        a.setActor(u);
+        a.setEventType(ActivityType.COMMENT);
+        a.setDescription(r.comment().trim());
+
+        logs.save(a);
+
+        return new ActivityView(
+                a.getId(),
+                user(u),
+                a.getEventType(),
+                a.getDescription(),
+                a.getCreatedAt()
+        );
+    }
+
 
 
 }

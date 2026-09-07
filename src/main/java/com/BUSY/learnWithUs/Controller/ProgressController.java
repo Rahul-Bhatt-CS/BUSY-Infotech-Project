@@ -1,5 +1,6 @@
 package com.BUSY.learnWithUs.Controller;
 
+import com.BUSY.learnWithUs.Dto.Progress.ProgressRequest;
 import com.BUSY.learnWithUs.Dto.Progress.ProgressView;
 import com.BUSY.learnWithUs.Entity.ProgressStatus;
 import com.BUSY.learnWithUs.Entity.User;
@@ -33,9 +34,9 @@ public class ProgressController{
     @PostMapping("/enrollments/{id}/progress")
     public ProgressView progress(
             @PathVariable Long id,
-            @RequestParam ProgressStatus status
+            @RequestBody ProgressRequest request
     ) {
-        return progressService.progress(me(), id, status);
+        return progressService.progress(me(), id, request.status());
     }
 
 }

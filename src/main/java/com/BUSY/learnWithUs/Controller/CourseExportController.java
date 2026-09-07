@@ -30,12 +30,10 @@ public class CourseExportController {
     }
 
     @GetMapping(
-            value = "/courses/{id}/export",
+            value = "/courses/{id}/progress/export",
             produces = "text/csv"
     )
-    public ResponseEntity<String> export(
-            @PathVariable Long id
-    ) {
+    public ResponseEntity<String> export(@PathVariable Long id) {
         return ResponseEntity
                 .ok()
                 .header(
@@ -44,5 +42,4 @@ public class CourseExportController {
                 )
                 .body(courseExportService.csv(me(), id));
     }
-
 }

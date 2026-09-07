@@ -4,7 +4,6 @@ import com.BUSY.learnWithUs.Dto.Alert.AlertView;
 import com.BUSY.learnWithUs.Entity.User;
 import com.BUSY.learnWithUs.Service.AuthService;
 import com.BUSY.learnWithUs.Service.InactivityAlertService;
-import jakarta.annotation.security.DenyAll;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,23 +28,18 @@ public class InactivityAlertController {
         );
     }
 
-    @GetMapping("/alerts")
+    @GetMapping("/inactivity-alerts")
     public List<AlertView> alerts() {
         return inactivityAlertService.alerts(me());
     }
 
-    @GetMapping("/alerts/count")
+    @GetMapping("/inactivity-alerts/count")
     public Map<String, Long> alertCount() {
-        return Map.of(
-                "count",
-                inactivityAlertService.alertCount(me())
-        );
+        return Map.of("count", inactivityAlertService.alertCount(me()));
     }
 
-    @PostMapping("/alerts/{id}/dismiss")
-    public ResponseEntity<Void> dismiss(
-            @PathVariable Long id
-    ) {
+    @PostMapping("/inactivity-alerts/{id}/dismiss")
+    public ResponseEntity<Void> dismiss(@PathVariable Long id) {
         inactivityAlertService.dismissAlert(me(), id);
 
         return ResponseEntity.noContent().build();

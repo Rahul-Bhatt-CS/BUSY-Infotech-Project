@@ -1,4 +1,8 @@
 package com.BUSY.learnWithUs.Dto.Progress;
 
-public class ProgressRequest {
+import com.BUSY.learnWithUs.Entity.ProgressStatus;
+
+public record ProgressRequest(
+        ProgressStatus status
+) {
 }
