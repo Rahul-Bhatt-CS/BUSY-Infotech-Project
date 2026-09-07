@@ -27,6 +27,7 @@ public class CourseController {
         );
     }
 
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'LEARNER')")
     @GetMapping("/courses")
     public PageResponse<CourseView> courses(
             @RequestParam(required = false) String search,
@@ -51,6 +52,7 @@ public class CourseController {
         );
     }
 
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'LEARNER')")
     @GetMapping("/courses/{id}")
     public CourseView course(@PathVariable Long id) {
         return courseService.getCourse(me(), id);

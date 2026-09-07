@@ -30,6 +30,7 @@ public class LessonController {
         );
     }
 
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'LEARNER')")
     @GetMapping("/courses/{id}/lessons")
     public List<LessonView> lessons(@PathVariable Long id) {
         return lessonService.getLessons(me(), id);

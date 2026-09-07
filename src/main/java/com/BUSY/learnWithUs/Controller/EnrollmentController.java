@@ -39,6 +39,7 @@ public class EnrollmentController {
         return enrollmentService.enroll(me(), id, request.learnerId());
     }
 
+    @PreAuthorize("hasRole('LEARNER')")
     @PostMapping("/courses/{id}/enroll")
     public EnrollmentView selfEnroll(@PathVariable Long id) {
         return enrollmentService.selfEnroll(me(), id);
