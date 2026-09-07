@@ -21,12 +21,7 @@ import java.util.Optional;
 public class BulkEnrollmentService {
     private final UserRepository users;
     private final CourseRepository courses;
-    private final LessonRepository lessons;
     private final EnrollmentRepository enrollments;
-    private final ActivityLogRepository logs;
-    private final InactivityAlertRepository alerts;
-    private final PasswordEncoder encoder;
-    private final JwtUtils jwt;
 
     private Course requireCourse(Long id) {
         return courses.findById(id)

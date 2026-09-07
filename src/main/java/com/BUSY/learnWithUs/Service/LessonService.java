@@ -22,14 +22,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class LessonService {
-    private final UserRepository users;
     private final CourseRepository courses;
     private final LessonRepository lessons;
-    private final EnrollmentRepository enrollments;
-    private final ActivityLogRepository logs;
-    private final InactivityAlertRepository alerts;
-    private final PasswordEncoder encoder;
-    private final JwtUtils jwt;
 
     public LessonView lesson(Lesson l) {
         return new LessonView(

@@ -19,14 +19,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class ProgressService {
-    private final UserRepository users;
-    private final CourseRepository courses;
-    private final LessonRepository lessons;
     private final EnrollmentRepository enrollments;
-    private final ActivityLogRepository logs;
-    private final InactivityAlertRepository alerts;
-    private final PasswordEncoder encoder;
-    private final JwtUtils jwt;
 
     @Transactional
     public ProgressView progress(

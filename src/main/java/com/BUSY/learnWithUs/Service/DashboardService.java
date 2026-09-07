@@ -26,13 +26,7 @@ import java.util.stream.Collectors;
 public class DashboardService {
     private final UserRepository users;
     private final CourseRepository courses;
-    private final LessonRepository lessons;
     private final EnrollmentRepository enrollments;
-    private final ActivityLogRepository logs;
-    private final InactivityAlertRepository alerts;
-    private final PasswordEncoder encoder;
-    private final JwtUtils jwt;
-
 
     private void instructor(User u) {
         if (u.getRole() != UserRole.INSTRUCTOR) {

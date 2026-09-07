@@ -7,7 +7,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
     String FILTER =
@@ -83,7 +85,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query(
             "select c from Course c " +
                     FILTER +
-                    " order by size(c.enrollments) asc"
+                    " order by (" +
+                    "select count(e) from Enrollment e " +
+                    "where e.course = c" +
+                    ") asc"
     )
     Page<Course> enrollmentAsc(
             @Param("role") String role,
@@ -97,7 +102,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query(
             "select c from Course c " +
                     FILTER +
-                    " order by size(c.enrollments) desc"
+                    " order by (" +
+                    "select count(e) from Enrollment e " +
+                    "where e.course = c" +
+                    ") desc"
     )
     Page<Course> enrollmentDesc(
             @Param("role") String role,
@@ -108,14 +116,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             Pageable p
     );
 
-    @Query(COUNT)
-    long countMatches(
-            @Param("role") String role,
-            @Param("search") String search,
-            @Param("category") String category,
-            @Param("status") CourseStatus status,
-            @Param("instructorId") Long instructorId
-    );
 
     @Query("select count(c) from Course c where c.status = :status")
     long countByStatus(@Param("status") CourseStatus status);

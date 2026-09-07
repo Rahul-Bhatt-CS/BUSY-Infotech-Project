@@ -20,12 +20,7 @@ import java.util.List;
 public class EnrollmentService {
     private final UserRepository users;
     private final CourseRepository courses;
-    private final LessonRepository lessons;
     private final EnrollmentRepository enrollments;
-    private final ActivityLogRepository logs;
-    private final InactivityAlertRepository alerts;
-    private final PasswordEncoder encoder;
-    private final JwtUtils jwt;
 
     public UserResponse user(User u) {
         return new UserResponse(u.getId(), u.getEmail(), u.getRole());
