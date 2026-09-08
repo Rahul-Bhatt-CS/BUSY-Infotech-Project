@@ -1,18 +1,27 @@
 package com.BUSY.learnWithUs.Controller;
 
-import com.BUSY.learnWithUs.Dto.Lesson.LessonRequest;
 import com.BUSY.learnWithUs.Dto.Lesson.LessonView;
 import com.BUSY.learnWithUs.Dto.Lesson.ReorderLessonsRequest;
 import com.BUSY.learnWithUs.Entity.User;
 import com.BUSY.learnWithUs.Service.AuthService;
+import com.BUSY.learnWithUs.Service.FileStorageService;
 import com.BUSY.learnWithUs.Service.LessonService;
 import lombok.AllArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api")
@@ -21,6 +30,7 @@ public class LessonController {
 
     private final AuthService authService;
     private final LessonService lessonService;
+    private final FileStorageService fileStorageService;
 
     private User me() {
         return authService.current(
@@ -37,21 +47,71 @@ public class LessonController {
     }
 
     @PreAuthorize("hasRole('INSTRUCTOR')")
-    @PostMapping("/courses/{id}/lessons")
+    @PostMapping(
+            value = "/courses/{id}/lessons",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     public LessonView addLesson(
             @PathVariable Long id,
-            @RequestBody LessonRequest r
+            @RequestParam String title,
+            @RequestParam(required = false) Integer position,
+            @RequestPart("file") MultipartFile file
     ) {
-        return lessonService.addLesson(me(), id, r);
+        return lessonService.addLesson(
+                me(),
+                id,
+                title,
+                position,
+                file
+        );
     }
 
     @PreAuthorize("hasRole('INSTRUCTOR')")
-    @PutMapping("/lessons/{id}")
+    @PutMapping(
+            value = "/lessons/{id}",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     public LessonView updateLesson(
             @PathVariable Long id,
-            @RequestBody LessonRequest r
+            @RequestParam String title,
+            @RequestParam(required = false) Integer position,
+            @RequestPart(value = "file", required = false)
+            MultipartFile file
     ) {
-        return lessonService.updateLesson(me(), id, r);
+        return lessonService.updateLesson(
+                me(),
+                id,
+                title,
+                position,
+                file
+        );
+    }
+
+    @PreAuthorize("hasAnyRole('INSTRUCTOR', 'LEARNER')")
+    @GetMapping("/lessons/{id}/file")
+    public ResponseEntity<Resource> lessonFile(
+            @PathVariable Long id
+    ) throws Exception {
+
+        Path path = lessonService.getLessonFilePath(me(), id);
+        Resource resource = new UrlResource(path.toUri());
+
+        String contentType = Files.probeContentType(path);
+
+        if (contentType == null) {
+            contentType = mediaTypeFor(path);
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline()
+                                .filename(path.getFileName().toString())
+                                .build()
+                                .toString()
+                )
+                .body(resource);
     }
 
     @PreAuthorize("hasRole('INSTRUCTOR')")
@@ -60,7 +120,6 @@ public class LessonController {
             @PathVariable Long id
     ) {
         lessonService.deleteLesson(me(), id);
-
         return ResponseEntity.noContent().build();
     }
 
@@ -71,8 +130,26 @@ public class LessonController {
             @RequestBody ReorderLessonsRequest request
     ) {
         lessonService.reorder(me(), id, request.lessonIds());
-
         return ResponseEntity.noContent().build();
     }
 
+    private String mediaTypeFor(Path path) {
+        String name = path.getFileName()
+                .toString()
+                .toLowerCase(Locale.ROOT);
+
+        if (name.endsWith(".pdf")) {
+            return MediaType.APPLICATION_PDF_VALUE;
+        }
+
+        if (name.endsWith(".ppt")) {
+            return "application/vnd.ms-powerpoint";
+        }
+
+        if (name.endsWith(".pptx")) {
+            return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        }
+
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+    }
 }

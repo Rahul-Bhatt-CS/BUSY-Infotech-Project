@@ -1,35 +1,36 @@
 package com.BUSY.learnWithUs.Service;
 
-import com.BUSY.learnWithUs.Dto.Lesson.LessonRequest;
 import com.BUSY.learnWithUs.Dto.Lesson.LessonView;
 import com.BUSY.learnWithUs.Entity.*;
 import com.BUSY.learnWithUs.Repository.*;
-import com.BUSY.learnWithUs.Security.JwtUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class LessonService {
+
     private final CourseRepository courses;
     private final LessonRepository lessons;
+    private final FileStorageService fileStorageService;
 
     public LessonView lesson(Lesson l) {
         return new LessonView(
                 l.getId(),
                 l.getTitle(),
-                l.getContent(),
+                l.getContent(), // Relative file location.
                 l.getPosition()
         );
     }
@@ -38,72 +39,77 @@ public class LessonService {
     public LessonView addLesson(
             User u,
             Long courseId,
-            LessonRequest r
+            String title,
+            Integer requestedPosition,
+            MultipartFile file
     ) {
         Course c = requireCourse(courseId);
 
         assertOwner(u, c);
-        validateLesson(r);
+        validateLesson(title, file, true);
 
-        List<Lesson> lessonList =
-                lessons.findByCourseIdOrderByPositionAsc(courseId);
+        String storedPath = fileStorageService.store(file);
 
-        int position = r.position() == null
-                ? lessonList.size() + 1
-                : r.position();
+        try {
+            List<Lesson> lessonList =
+                    lessons.findByCourseIdOrderByPositionAsc(courseId);
 
-        if (position < 1) {
-            throw new IllegalArgumentException(
-                    "Position must be positive"
-            );
+            int position = requestedPosition == null
+                    ? lessonList.size() + 1
+                    : requestedPosition;
+
+            if (position < 1) {
+                throw new IllegalArgumentException(
+                        "Position must be positive"
+                );
+            }
+
+            if (position > lessonList.size() + 1) {
+                position = lessonList.size() + 1;
+            }
+
+            /*
+             * Temporarily move existing lessons so the unique
+             * (course_id, position) constraint cannot collide.
+             */
+            for (int i = 0; i < lessonList.size(); i++) {
+                lessonList.get(i).setPosition(-(i + 1));
+            }
+
+            lessons.saveAll(lessonList);
+            lessons.flush();
+
+            Lesson newLesson = new Lesson();
+
+            newLesson.setCourse(c);
+            newLesson.setTitle(title.trim());
+            newLesson.setContent(storedPath);
+            newLesson.setPosition(position);
+
+            lessonList.add(position - 1, newLesson);
+
+            for (int i = 0; i < lessonList.size(); i++) {
+                lessonList.get(i).setPosition(i + 1);
+            }
+
+            lessons.saveAll(lessonList);
+            lessons.flush();
+
+            return lesson(newLesson);
+
+        } catch (RuntimeException e) {
+            fileStorageService.delete(storedPath);
+            throw e;
         }
-
-        if (position > lessonList.size() + 1) {
-            position = lessonList.size() + 1;
-        }
-
-        /*
-         * Temporarily move existing lessons.
-         */
-        for (int i = 0; i < lessonList.size(); i++) {
-            lessonList.get(i).setPosition(-(i + 1));
-        }
-
-        lessons.saveAll(lessonList);
-
-        /*
-         * Make sure temporary values reach MySQL.
-         */
-        lessons.flush();
-
-        /*
-         * Rebuild the positions including the new lesson.
-         */
-        Lesson newLesson = new Lesson();
-
-        newLesson.setCourse(c);
-        newLesson.setTitle(r.title().trim());
-        newLesson.setContent(r.content());
-        newLesson.setPosition(position);
-
-        lessonList.add(position - 1, newLesson);
-
-        for (int i = 0; i < lessonList.size(); i++) {
-            lessonList.get(i).setPosition(i + 1);
-        }
-
-        lessons.saveAll(lessonList);
-
-        lessons.flush();
-
-        return lesson(newLesson);
     }
 
     @Transactional
     public LessonView updateLesson(
             User u,
             Long id,
-            LessonRequest r
+            String title,
+            Integer requestedPosition,
+            MultipartFile file
     ) {
         Lesson lesson = lessons.findById(id)
                 .orElseThrow(
@@ -111,118 +117,119 @@ public class LessonService {
                 );
 
         assertOwner(u, lesson.getCourse());
-        validateLesson(r);
 
-        Long courseId = lesson.getCourse().getId();
-
-        int oldPosition = lesson.getPosition();
-
-        int newPosition = r.position() == null
-                ? oldPosition
-                : r.position();
-
-        if (newPosition < 1) {
-            throw new IllegalArgumentException(
-                    "Position must be positive"
-            );
-        }
-
-        List<Lesson> lessonList =
-                lessons.findByCourseIdOrderByPositionAsc(courseId);
-
-        if (newPosition > lessonList.size()) {
-            newPosition = lessonList.size();
-        }
-
-        /*
-         * No position change.
-         * Only update the lesson's content.
-         */
-        if (newPosition == oldPosition) {
-            lesson.setTitle(r.title().trim());
-            lesson.setContent(r.content());
-            lesson.setUpdatedAt(LocalDateTime.now());
-
-            return lesson(lessons.save(lesson));
-        }
-
-        /*
-         * Remove the lesson from the current ordering.
-         */
-        lessonList.removeIf(
-                x -> x.getId().equals(id)
-        );
-
-        /*
-         * Insert it into the requested position.
-         *
-         * List index is zero-based,
-         * lesson position is one-based.
-         */
-        lessonList.add(newPosition - 1, lesson);
-
-        /*
-         * STEP 1:
-         * Give every lesson a temporary negative position.
-         *
-         * This makes every position unique.
-         */
-        for (int i = 0; i < lessonList.size(); i++) {
-            lessonList.get(i).setPosition(-(i + 1));
-        }
-
-        lessons.saveAll(lessonList);
-
-        /*
-         * VERY IMPORTANT:
-         * Force Hibernate to execute the temporary UPDATEs now.
-         */
-        lessons.flush();
-
-        /*
-         * STEP 2:
-         * Assign the final positions 1..N.
-         */
-        for (int i = 0; i < lessonList.size(); i++) {
-            Lesson current = lessonList.get(i);
-
-            current.setPosition(i + 1);
-        }
-
-        /*
-         * Update the lesson itself.
-         */
-        lesson.setTitle(r.title().trim());
-        lesson.setContent(r.content());
-        lesson.setUpdatedAt(LocalDateTime.now());
-
-        lessons.saveAll(lessonList);
-
-        /*
-         * Force the final UPDATEs.
-         */
-        lessons.flush();
-
-        return lesson(lesson);
-    }
-
-    private void validateLesson(LessonRequest r) {
-        if (
-                r == null
-                        || r.title() == null
-                        || r.title().isBlank()
-        ) {
+        if (title == null || title.isBlank()) {
             throw new IllegalArgumentException(
                     "Lesson title is required"
             );
         }
 
-        if (
-                r.content() == null
-                        || r.content().isBlank()
-        ) {
+        if (file != null && !file.isEmpty()) {
+            validateLesson(title, file, false);
+        }
+
+        String oldPath = lesson.getContent();
+        String newPath = oldPath;
+
+        if (file != null && !file.isEmpty()) {
+            newPath = fileStorageService.store(file);
+        }
+
+        try {
+            Long courseId = lesson.getCourse().getId();
+
+            int oldPosition = lesson.getPosition();
+
+            int newPosition = requestedPosition == null
+                    ? oldPosition
+                    : requestedPosition;
+
+            if (newPosition < 1) {
+                throw new IllegalArgumentException(
+                        "Position must be positive"
+                );
+            }
+
+            List<Lesson> lessonList =
+                    lessons.findByCourseIdOrderByPositionAsc(courseId);
+
+            if (newPosition > lessonList.size()) {
+                newPosition = lessonList.size();
+            }
+
+            /*
+             * No position change.
+             */
+            if (newPosition == oldPosition) {
+                lesson.setTitle(title.trim());
+                lesson.setContent(newPath);
+                lesson.setUpdatedAt(LocalDateTime.now());
+
+                Lesson saved = lessons.save(lesson);
+
+                if (!newPath.equals(oldPath)) {
+                    fileStorageService.delete(oldPath);
+                }
+
+                return lesson(saved);
+            }
+
+            lessonList.removeIf(
+                    x -> x.getId().equals(id)
+            );
+
+            lessonList.add(newPosition - 1, lesson);
+
+            /*
+             * Temporarily move every lesson to a unique negative
+             * position before assigning the final ordering.
+             */
+            for (int i = 0; i < lessonList.size(); i++) {
+                lessonList.get(i).setPosition(-(i + 1));
+            }
+
+            lessons.saveAll(lessonList);
+            lessons.flush();
+
+            for (int i = 0; i < lessonList.size(); i++) {
+                lessonList.get(i).setPosition(i + 1);
+            }
+
+            lesson.setTitle(title.trim());
+            lesson.setContent(newPath);
+            lesson.setUpdatedAt(LocalDateTime.now());
+
+            lessons.saveAll(lessonList);
+            lessons.flush();
+
+            if (!newPath.equals(oldPath)) {
+                fileStorageService.delete(oldPath);
+            }
+
+            return lesson(lesson);
+
+        } catch (RuntimeException e) {
+            if (!newPath.equals(oldPath)) {
+                fileStorageService.delete(newPath);
+            }
+            throw e;
+        }
+    }
+
+    private void validateLesson(
+            String title,
+            MultipartFile file,
+            boolean requireFile
+    ) {
+        if (title == null || title.isBlank()) {
             throw new IllegalArgumentException(
-                    "Lesson content is required"
+                    "Lesson title is required"
+            );
+        }
+
+        if (requireFile && (file == null || file.isEmpty())) {
+            throw new IllegalArgumentException(
+                    "A PDF, PPT, or PPTX lesson file is required"
             );
         }
     }
@@ -237,7 +244,6 @@ public class LessonService {
         }
     }
 
-
     @Transactional
     public void deleteLesson(
             User u,
@@ -251,6 +257,7 @@ public class LessonService {
         assertOwner(u, lesson.getCourse());
 
         Long courseId = lesson.getCourse().getId();
+        String filePath = lesson.getContent();
 
         List<Lesson> lessonList =
                 lessons.findByCourseIdOrderByPositionAsc(courseId);
@@ -259,32 +266,23 @@ public class LessonService {
                 x -> x.getId().equals(id)
         );
 
-        /*
-         * Temporarily clear all positions.
-         */
         for (int i = 0; i < lessonList.size(); i++) {
             lessonList.get(i).setPosition(-(i + 1));
         }
 
         lessons.saveAll(lessonList);
-
         lessons.flush();
 
-        /*
-         * Rebuild positions.
-         */
         for (int i = 0; i < lessonList.size(); i++) {
             lessonList.get(i).setPosition(i + 1);
         }
 
         lessons.saveAll(lessonList);
 
-        /*
-         * Delete after the remaining lessons have safe positions.
-         */
         lessons.delete(lesson);
-
         lessons.flush();
+
+        fileStorageService.delete(filePath);
     }
 
     @Transactional
@@ -323,37 +321,18 @@ public class LessonService {
                                 )
                         );
 
-        /*
-         * STEP 1:
-         * Temporarily move every lesson away from
-         * the real positions.
-         */
         for (int i = 0; i < lessonList.size(); i++) {
             lessonList.get(i).setPosition(-(i + 1));
         }
 
         lessons.saveAll(lessonList);
-
-        /*
-         * Force temporary positions into the database.
-         */
         lessons.flush();
 
-        /*
-         * STEP 2:
-         * Apply requested order.
-         */
         for (int i = 0; i < ids.size(); i++) {
-            lessonMap
-                    .get(ids.get(i))
-                    .setPosition(i + 1);
+            lessonMap.get(ids.get(i)).setPosition(i + 1);
         }
 
         lessons.saveAll(lessonList);
-
-        /*
-         * Force final positions into the database.
-         */
         lessons.flush();
     }
 
@@ -372,14 +351,32 @@ public class LessonService {
                 .toList();
     }
 
+    public Path getLessonFilePath(
+            User u,
+            Long lessonId
+    ) {
+        Lesson lesson = lessons.findById(lessonId)
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Lesson not found")
+                );
+
+        canAccess(u, lesson.getCourse());
+
+        return fileStorageService.load(lesson.getContent());
+    }
+
     private Course requireCourse(Long id) {
         return courses.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Course not found"));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Course not found")
+                );
     }
 
     private void instructor(User u) {
         if (u.getRole() != UserRole.INSTRUCTOR) {
-            throw new AccessDeniedException("Instructor access required");
+            throw new AccessDeniedException(
+                    "Instructor access required"
+            );
         }
     }
 
@@ -389,7 +386,9 @@ public class LessonService {
         }
 
         if (c.getStatus() != CourseStatus.PUBLISHED) {
-            throw new AccessDeniedException("Course is not accessible");
+            throw new AccessDeniedException(
+                    "Course is not accessible"
+            );
         }
     }
 }
