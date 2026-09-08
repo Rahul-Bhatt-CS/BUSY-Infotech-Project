@@ -45,36 +45,58 @@ public class LessonService {
         assertOwner(u, c);
         validateLesson(r);
 
-        Lesson l = new Lesson();
+        List<Lesson> lessonList =
+                lessons.findByCourseIdOrderByPositionAsc(courseId);
 
-        l.setCourse(c);
-        l.setTitle(r.title().trim());
-        l.setContent(r.content());
-        if(r.position() == null){
-            l.setPosition((int) lessons.countByCourseId(courseId) + 1);
-        }else{
-            l.setPosition(r.position());
-        }
+        int position = r.position() == null
+                ? lessonList.size() + 1
+                : r.position();
 
-//        l.position = r.position() == null
-//                ? (int) lessons.countByCourseId(courseId) + 1
-//                : r.position();
-
-        if (l.getPosition() < 1) {
+        if (position < 1) {
             throw new IllegalArgumentException(
                     "Position must be positive"
             );
         }
 
-        shiftForInsert(
-                courseId,
-                l.getPosition(),
-                null
-        );
+        if (position > lessonList.size() + 1) {
+            position = lessonList.size() + 1;
+        }
 
-        lessons.save(l);
+        /*
+         * Temporarily move existing lessons.
+         */
+        for (int i = 0; i < lessonList.size(); i++) {
+            lessonList.get(i).setPosition(-(i + 1));
+        }
 
-        return lesson(l);
+        lessons.saveAll(lessonList);
+
+        /*
+         * Make sure temporary values reach MySQL.
+         */
+        lessons.flush();
+
+        /*
+         * Rebuild the positions including the new lesson.
+         */
+        Lesson newLesson = new Lesson();
+
+        newLesson.setCourse(c);
+        newLesson.setTitle(r.title().trim());
+        newLesson.setContent(r.content());
+        newLesson.setPosition(position);
+
+        lessonList.add(position - 1, newLesson);
+
+        for (int i = 0; i < lessonList.size(); i++) {
+            lessonList.get(i).setPosition(i + 1);
+        }
+
+        lessons.saveAll(lessonList);
+
+        lessons.flush();
+
+        return lesson(newLesson);
     }
 
     @Transactional
@@ -83,54 +105,105 @@ public class LessonService {
             Long id,
             LessonRequest r
     ) {
-        Lesson l = lessons.findById(id)
+        Lesson lesson = lessons.findById(id)
                 .orElseThrow(
                         () -> new EntityNotFoundException("Lesson not found")
                 );
 
-        assertOwner(u, l.getCourse());
+        assertOwner(u, lesson.getCourse());
         validateLesson(r);
 
-        int old = l.getPosition();
-        int np = r.position() == null
-                ? old
+        Long courseId = lesson.getCourse().getId();
+
+        int oldPosition = lesson.getPosition();
+
+        int newPosition = r.position() == null
+                ? oldPosition
                 : r.position();
 
-        if (np < 1) {
+        if (newPosition < 1) {
             throw new IllegalArgumentException(
                     "Position must be positive"
             );
         }
 
-        if (np != old) {
-            List<Lesson> ls =
-                    lessons.findByCourseIdOrderByPositionAsc(
-                            l.getCourse().getId()
-                    );
+        List<Lesson> lessonList =
+                lessons.findByCourseIdOrderByPositionAsc(courseId);
 
-            if (np > ls.size()) {
-                np = ls.size();
-            }
-
-            for (Lesson x : ls) {
-                if (
-                        !x.getId().equals(id)
-                                && x.getPosition() >= Math.min(old, np)
-                                && x.getPosition() <= Math.max(old, np)
-                ) {
-                    x.setPosition(x.getPosition() + old > np ? 1 : -1);
-                }
-            }
+        if (newPosition > lessonList.size()) {
+            newPosition = lessonList.size();
         }
 
-        l.setTitle(r.title().trim());
-        l.setContent(r.content());
-        l.setPosition(np);
-        l.setUpdatedAt(LocalDateTime.now());
+        /*
+         * No position change.
+         * Only update the lesson's content.
+         */
+        if (newPosition == oldPosition) {
+            lesson.setTitle(r.title().trim());
+            lesson.setContent(r.content());
+            lesson.setUpdatedAt(LocalDateTime.now());
 
-        lessons.save(l);
+            return lesson(lessons.save(lesson));
+        }
 
-        return lesson(l);
+        /*
+         * Remove the lesson from the current ordering.
+         */
+        lessonList.removeIf(
+                x -> x.getId().equals(id)
+        );
+
+        /*
+         * Insert it into the requested position.
+         *
+         * List index is zero-based,
+         * lesson position is one-based.
+         */
+        lessonList.add(newPosition - 1, lesson);
+
+        /*
+         * STEP 1:
+         * Give every lesson a temporary negative position.
+         *
+         * This makes every position unique.
+         */
+        for (int i = 0; i < lessonList.size(); i++) {
+            lessonList.get(i).setPosition(-(i + 1));
+        }
+
+        lessons.saveAll(lessonList);
+
+        /*
+         * VERY IMPORTANT:
+         * Force Hibernate to execute the temporary UPDATEs now.
+         */
+        lessons.flush();
+
+        /*
+         * STEP 2:
+         * Assign the final positions 1..N.
+         */
+        for (int i = 0; i < lessonList.size(); i++) {
+            Lesson current = lessonList.get(i);
+
+            current.setPosition(i + 1);
+        }
+
+        /*
+         * Update the lesson itself.
+         */
+        lesson.setTitle(r.title().trim());
+        lesson.setContent(r.content());
+        lesson.setUpdatedAt(LocalDateTime.now());
+
+        lessons.saveAll(lessonList);
+
+        /*
+         * Force the final UPDATEs.
+         */
+        lessons.flush();
+
+        return lesson(lesson);
     }
 
     private void validateLesson(LessonRequest r) {
@@ -164,50 +237,54 @@ public class LessonService {
         }
     }
 
-    private void shiftForInsert(
-            Long cid,
-            int pos,
-            Long ignore
-    ) {
-        List<Lesson> ls =
-                lessons.findByCourseIdOrderByPositionAsc(cid);
-
-        for (Lesson x : ls) {
-            if (
-                    !Objects.equals(x.getId(), ignore)
-                            && x.getPosition() >= pos
-            ) {
-                x.setPosition(x.getPosition() + 1);
-            }
-        }
-    }
 
     @Transactional
     public void deleteLesson(
             User u,
             Long id
     ) {
-        Lesson l = lessons.findById(id)
+        Lesson lesson = lessons.findById(id)
                 .orElseThrow(
                         () -> new EntityNotFoundException("Lesson not found")
                 );
 
-        assertOwner(u, l.getCourse());
+        assertOwner(u, lesson.getCourse());
 
-        int old = l.getPosition();
+        Long courseId = lesson.getCourse().getId();
 
-        lessons.delete(l);
+        List<Lesson> lessonList =
+                lessons.findByCourseIdOrderByPositionAsc(courseId);
 
-        for (
-                Lesson x :
-                lessons.findByCourseIdOrderByPositionAsc(
-                        l.getCourse().getId()
-                )
-        ) {
-            if (x.getPosition() > old) {
-                x.setPosition(x.getPosition() - 1);
-            }
+        lessonList.removeIf(
+                x -> x.getId().equals(id)
+        );
+
+        /*
+         * Temporarily clear all positions.
+         */
+        for (int i = 0; i < lessonList.size(); i++) {
+            lessonList.get(i).setPosition(-(i + 1));
         }
+
+        lessons.saveAll(lessonList);
+
+        lessons.flush();
+
+        /*
+         * Rebuild positions.
+         */
+        for (int i = 0; i < lessonList.size(); i++) {
+            lessonList.get(i).setPosition(i + 1);
+        }
+
+        lessons.saveAll(lessonList);
+
+        /*
+         * Delete after the remaining lessons have safe positions.
+         */
+        lessons.delete(lesson);
+
+        lessons.flush();
     }
 
     @Transactional
@@ -220,14 +297,15 @@ public class LessonService {
 
         assertOwner(u, c);
 
-        List<Lesson> ls =
+        List<Lesson> lessonList =
                 lessons.findByCourseIdOrderByPositionAsc(cid);
 
         if (
-                ls.size() != ids.size()
-                        || new HashSet<>(ids).size() != ls.size()
-                        || !ls.stream()
-                        .map(x -> x.getId())
+                ids == null
+                        || lessonList.size() != ids.size()
+                        || new HashSet<>(ids).size() != ids.size()
+                        || !lessonList.stream()
+                        .map(Lesson::getId)
                         .collect(Collectors.toSet())
                         .equals(new HashSet<>(ids))
         ) {
@@ -236,20 +314,47 @@ public class LessonService {
             );
         }
 
-        Map<Long, Lesson> m =
-                ls.stream()
+        Map<Long, Lesson> lessonMap =
+                lessonList.stream()
                         .collect(
                                 Collectors.toMap(
-                                        x -> x.getId(),
-                                        x -> x
+                                        Lesson::getId,
+                                        lesson -> lesson
                                 )
                         );
 
-        for (int i = 0; i < ids.size(); i++) {
-            m.get(ids.get(i)).setPosition(i+1);
+        /*
+         * STEP 1:
+         * Temporarily move every lesson away from
+         * the real positions.
+         */
+        for (int i = 0; i < lessonList.size(); i++) {
+            lessonList.get(i).setPosition(-(i + 1));
         }
 
-        lessons.saveAll(ls);
+        lessons.saveAll(lessonList);
+
+        /*
+         * Force temporary positions into the database.
+         */
+        lessons.flush();
+
+        /*
+         * STEP 2:
+         * Apply requested order.
+         */
+        for (int i = 0; i < ids.size(); i++) {
+            lessonMap
+                    .get(ids.get(i))
+                    .setPosition(i + 1);
+        }
+
+        lessons.saveAll(lessonList);
+
+        /*
+         * Force final positions into the database.
+         */
+        lessons.flush();
     }
 
     public List<LessonView> getLessons(

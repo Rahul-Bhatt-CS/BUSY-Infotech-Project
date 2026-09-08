@@ -8,48 +8,49 @@ import com.BUSY.learnWithUs.Entity.ProgressStatus;
 import com.BUSY.learnWithUs.Entity.User;
 import com.BUSY.learnWithUs.Entity.UserRole;
 import com.BUSY.learnWithUs.Repository.*;
-import com.BUSY.learnWithUs.Security.JwtUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
+
     private final UserRepository users;
     private final CourseRepository courses;
     private final EnrollmentRepository enrollments;
 
     private void instructor(User u) {
         if (u.getRole() != UserRole.INSTRUCTOR) {
-            throw new AccessDeniedException("Instructor access required");
+            throw new AccessDeniedException(
+                    "Instructor access required"
+            );
         }
     }
 
     public Dashboard dashboard(User u) {
+
         instructor(u);
 
-        Instant now = Instant.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         YearMonth ym =
-                YearMonth.now(
-                        ZoneOffset.UTC
-                );
+                YearMonth.now();
 
-        Instant start =
+        LocalDateTime start =
                 ym.atDay(1)
-                        .atStartOfDay(
-                                ZoneOffset.UTC
-                        )
-                        .toInstant();
+                        .atStartOfDay();
 
         long totalLearners =
                 users.countByRole(
@@ -74,7 +75,8 @@ public class DashboardService {
                         ProgressStatus.IN_PROGRESS
                 );
 
-        Map<String, Long> by = new LinkedHashMap<>();
+        Map<String, Long> by =
+                new LinkedHashMap<>();
 
         for (ProgressStatus status : ProgressStatus.values()) {
             by.put(
@@ -91,7 +93,9 @@ public class DashboardService {
                                         new EnrollmentByCourse(
                                                 c.getId(),
                                                 c.getTitle(),
-                                                enrollments.countByCourseId(c.getId())
+                                                enrollments.countByCourseId(
+                                                        c.getId()
+                                                )
                                         )
                         )
                         .sorted(
@@ -105,28 +109,20 @@ public class DashboardService {
                 new ArrayList<>();
 
         LocalDate today =
-                LocalDate.now(
-                        ZoneOffset.UTC
-                );
+                LocalDate.now();
 
         for (int i = 7; i >= 0; i--) {
 
             LocalDate monday =
                     today.minusWeeks(i)
-                            .with(
-                                    java.time.DayOfWeek.MONDAY
-                            );
+                            .with(DayOfWeek.MONDAY);
 
-            Instant from =
-                    monday.atStartOfDay(
-                            ZoneOffset.UTC
-                    ).toInstant();
+            LocalDateTime from =
+                    monday.atStartOfDay();
 
-            Instant to =
+            LocalDateTime to =
                     monday.plusWeeks(1)
-                            .atStartOfDay(
-                                    ZoneOffset.UTC
-                            ).toInstant();
+                            .atStartOfDay();
 
             weeks.add(
                     new WeeklyCompletion(
@@ -151,5 +147,4 @@ public class DashboardService {
                 weeks
         );
     }
-
 }

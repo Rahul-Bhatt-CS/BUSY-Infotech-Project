@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,5 +21,5 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     List<Enrollment> findByCourseIdOrderByEnrolledAtDesc(Long courseId);
     long countByProgressStatus(ProgressStatus status);
     long countByCourseId(Long courseId);
-    long countByProgressStatusAndCompletedAtBetween(ProgressStatus status, Instant from, Instant to);
+    long countByProgressStatusAndCompletedAtBetween(ProgressStatus status, LocalDateTime from, LocalDateTime to);
 }
