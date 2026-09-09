@@ -8,6 +8,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -19,7 +21,7 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
 
         createInstructor();
-        createLearner();
+        createLearners();
     }
 
     private void createInstructor() {
@@ -38,19 +40,33 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    private void createLearner() {
+    private void createLearners() {
 
-        String email = "learner@learnwithus.com";
+        List<String> learners = List.of(
+                "learner@learnwithus.com",
+                "learner1@learnwithus.com",
+                "learner2@learnwithus.com",
+                "learner3@learnwithus.com",
+                "learner4@learnwithus.com",
+                "learner5@learnwithus.com",
+                "learner6@learnwithus.com",
+                "learner7@learnwithus.com",
+                "learner8@learnwithus.com",
+                "learner9@learnwithus.com"
+        );
 
-        if (userRepository.findByEmail(email).isEmpty()) {
+        for (String email : learners) {
 
-            User learner = User.builder()
-                    .email(email)
-                    .password(passwordEncoder.encode("Learner@123"))
-                    .role(UserRole.LEARNER)
-                    .build();
+            if (userRepository.findByEmail(email).isEmpty()) {
 
-            userRepository.save(learner);
+                User learner = User.builder()
+                        .email(email)
+                        .password(passwordEncoder.encode("Learner@123"))
+                        .role(UserRole.LEARNER)
+                        .build();
+
+                userRepository.save(learner);
+            }
         }
     }
 }
