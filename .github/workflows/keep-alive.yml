@@ -1,0 +1,28 @@
+name: Keep Services Alive
+
+on:
+  schedule:
+    - cron: "0 */5 * * *"
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Render + Aiven
+        run: |
+          echo "Pinging backend..."
+
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 60 \
+            https://busy-infotech-project.onrender.com/health)
+
+          echo "Response: $response"
+
+          if [ "$response" -ne 200 ]; then
+            echo "Health check failed"
+            exit 1
+          fi
+
+          echo "Render and database are responding."
