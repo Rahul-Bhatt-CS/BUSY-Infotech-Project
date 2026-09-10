@@ -1,344 +1,888 @@
-# Course Delivery & Enrollment
+# LearnWithUs — Backend
 
-A course delivery and enrollment system for internal training, designed to replace emailed course folders and manually maintained completion spreadsheets.
+Spring Boot REST API for the **LearnWithUs Course Delivery & Enrollment System**.
 
-> **Assignment 05 — Course Delivery & Enrollment**
+The backend handles authentication, role-based authorization, course and lesson management, learner enrollment and progress, bulk enrollment, activity history, inactivity alerts, dashboard data, CSV exports, and lesson file uploads.
 
-## Overview
+## Features
 
-The application provides a single place for instructors to build and manage courses, enroll learners, and monitor progress, while allowing learners to discover published courses, enroll themselves, work through lessons, and track their own progress.
+* JWT-based authentication
+* Instructor and learner roles
+* Server-side role-based authorization
+* Course creation, editing, publishing, archiving and restoration
+* Lesson creation, editing, deletion and reordering
+* PDF, PPT and PPTX lesson file uploads
+* Learner self-enrollment
+* Instructor enrollment
+* Bulk learner enrollment by email
+* Per-address bulk enrollment results
+* Learner progress tracking
+* Course and progress state validation
+* Server-side course search, filtering, sorting and pagination
+* Instructor dashboard and statistics
+* Immutable course activity history
+* Learner/instructor comments
+* Inactivity alerts after more than 14 days without progress
+* CSV export of course enrollment progress
+* Health check endpoint
 
-The product also provides server-side course discovery, bulk enrollment, CSV progress export, an instructor dashboard, immutable course activity history, and inactivity alerts.
+---
 
-The assignment defines ten mandatory goals. Optional stretch features are intentionally excluded from the required scope.
+## Tech Stack
 
-## Core Features
+| Component           | Technology                  |
+| ------------------- | --------------------------- |
+| Language            | Java 21                     |
+| Framework           | Spring Boot 3.4.2           |
+| Build Tool          | Maven                       |
+| Data Access         | Spring Data JPA / Hibernate |
+| Database            | MySQL                       |
+| Security            | Spring Security + JWT       |
+| Password Hashing    | BCrypt                      |
+| Validation          | Jakarta Bean Validation     |
+| File Uploads        | Spring Multipart            |
+| Containerization    | Docker                      |
+| Production Backend  | Render                      |
+| Production Database | Aiven MySQL                 |
 
-- Email/password authentication.
-- Instructor and learner roles.
-- Server-enforced authorization.
-- Course creation, editing, publishing, archiving, and restoration.
-- Course title, description, and category.
-- Lesson creation, editing, reordering, removal, and ordered display.
-- Course lifecycle: `Draft → Published → Archived`.
-- Learner progress lifecycle: `Not Started → In Progress → Completed`.
-- Instructor enrollment and learner self-enrollment.
-- Per-learner, per-course progress tracking.
-- Server-side course search and discovery.
-- Search by title and description.
-- Filters for category, status, and instructor.
-- Sorting by title, creation date, or enrollment count.
-- Pagination with total match counts.
-- Bulk enrollment through pasted/uploaded email lists.
-- Per-address bulk enrollment results.
-- CSV export of enrolled learner progress.
-- Instructor dashboard with required headline metrics.
-- Enrollment and progress breakdowns.
-- Eight-week completion chart.
-- Immutable course activity log.
-- Instructor inactivity alerts with dismissal and reappearance behavior.
+---
 
-## Roles
+## Project Structure
 
-### Instructor
+```text
+src/main/java/com/BUSY/learnWithUs/
+│
+├── Controller/
+│   ├── ActivityController.java
+│   ├── AuthController.java
+│   ├── BulkEnrollmentController.java
+│   ├── CourseController.java
+│   ├── CourseExportController.java
+│   ├── DashboardController.java
+│   ├── EnrollmentController.java
+│   ├── HealthController.java
+│   ├── InactivityAlertController.java
+│   ├── LessonController.java
+│   └── ProgressController.java
+│
+├── Dto/
+│   ├── Activity/
+│   ├── Alert/
+│   ├── Auth/
+│   ├── Bulk/
+│   ├── Course/
+│   ├── Dashboard/
+│   ├── Enrollment/
+│   ├── Lesson/
+│   └── Progress/
+│
+├── Entity/
+│   ├── User.java
+│   ├── Course.java
+│   ├── Lesson.java
+│   ├── Enrollment.java
+│   ├── ActivityLog.java
+│   └── InactivityAlert.java
+│
+├── Repository/
+│
+├── Security/
+│   ├── DataSeeder.java
+│   ├── JwtAuthenticationFilter.java
+│   ├── JwtUtils.java
+│   ├── SecurityConfig.java
+│   └── UserDetailsServiceImpl.java
+│
+└── Service/
+    ├── ActivityService.java
+    ├── AuthService.java
+    ├── BulkEnrollmentService.java
+    ├── CourseExportService.java
+    ├── CourseService.java
+    ├── DashboardService.java
+    ├── EnrollmentService.java
+    ├── FileStorageService.java
+    ├── InactivityAlertService.java
+    ├── LessonService.java
+    └── ProgressService.java
+```
 
-Instructors can manage courses and lessons, publish/archive/restore courses, enroll learners, bulk-enroll learners, search and inspect all courses, view relevant progress and activity history, export course progress, and manage inactivity alerts.
+The application follows a layered structure:
 
-### Learner
+```text
+Controller
+    ↓
+Service
+    ↓
+Repository
+    ↓
+MySQL
+```
 
-Learners can view published courses, enroll themselves, view their enrolled courses and their own progress, and work through course lessons.
+DTOs are used for API requests and responses rather than exposing the database entities directly.
 
-Learners cannot edit course content, enroll other learners, or see other learners' progress.
+---
 
-All role restrictions are required to be enforced on the server.
+## Database Model
+
+The main tables are:
+
+```text
+users
+courses
+lessons
+enrollments
+activity_logs
+inactivity_alerts
+```
+
+The important relationships are:
+
+```text
+User 1 ────────< Course
+
+Course 1 ──────< Lesson
+
+User 1 ────────< Enrollment >──────── 1 Course
+
+Course 1 ──────< ActivityLog
+User   1 ───────< ActivityLog
+
+Enrollment 1 ──< InactivityAlert
+```
+
+`Enrollment` represents the many-to-many relationship between learners and courses and also stores the learner's progress state.
+
+For the complete schema and design reasoning, see:
+
+```text
+docs/schema.md
+```
+
+---
+
+## Authentication
+
+Authentication uses JWT.
+
+### Register
+
+```http
+POST /api/auth/register
+```
+
+### Login
+
+```http
+POST /api/auth/login
+```
+
+A successful login returns a JWT which the frontend sends with protected requests:
+
+```http
+Authorization: Bearer <JWT>
+```
+
+### Current user
+
+```http
+GET /api/auth/me
+```
+
+Passwords are stored using BCrypt rather than plain text.
+
+The application uses stateless Spring Security sessions.
+
+---
+
+## Roles and Authorization
+
+There are two roles:
+
+```text
+INSTRUCTOR
+LEARNER
+```
+
+Authorization is enforced on the backend using Spring Security and method-level authorization.
+
+Examples:
+
+```text
+Instructor
+├── Create/update courses
+├── Manage lessons
+├── Publish/archive/restore courses
+├── Enroll learners
+├── Bulk enroll learners
+├── View course enrollment/progress
+├── Export progress
+└── Manage inactivity alerts
+
+Learner
+├── View published courses
+├── Self-enroll
+├── View own enrollments
+└── Update own progress
+```
+
+The frontend does not act as the security boundary.
+
+---
 
 ## Course Lifecycle
+
+Courses follow:
 
 ```text
 Draft → Published → Archived
 ```
 
-A course cannot be published until it contains at least one lesson. The server must reject publication of an empty course with an explanatory message.
+A course cannot be published without at least one lesson.
 
-Archiving removes the course from the learner catalogue but does not delete its lessons or enrollment history.
+Archiving a course does not delete its lessons or enrollment history.
+
+An archived course can be restored to `Draft`.
+
+---
 
 ## Learner Progress
+
+Learner progress follows:
 
 ```text
 Not Started → In Progress → Completed
 ```
 
-Progress is tracked separately for every learner/course relationship. Invalid transitions are rejected by the server.
+Progress is stored separately for every learner/course enrollment.
+
+Invalid state transitions are rejected by the backend.
+
+---
 
 ## Course Discovery
 
-The course list is role-aware:
+The course API supports server-side:
 
-- **Learners:** published courses.
-- **Instructors:** drafts, published courses, and archived courses.
+* Text search
+* Category filtering
+* Status filtering
+* Instructor filtering
+* Sorting by title
+* Sorting by creation date
+* Sorting by enrollment count
+* Pagination
+* Total result count
 
-Discovery is performed on the server and supports:
+Example:
 
-- Text search over title and description.
-- Category filter.
-- Status filter.
-- Instructor filter.
-- Sorting by title.
-- Sorting by creation date.
-- Sorting by enrollment count.
-- Pagination.
-- Total number of matching results.
+```http
+GET /api/courses?page=0&size=10&search=java&sortBy=title&sortDirection=asc
+```
 
-The browser must not load the complete course catalogue and perform filtering/search/sorting locally.
+The backend performs these operations through the database rather than loading the complete course catalogue into the browser.
+
+---
 
 ## Enrollment
 
-Learners can self-enroll in published courses.
+### Instructor enrollment
 
-Instructors can enroll learners in published courses.
+```http
+POST /api/courses/{courseId}/enrollments
+```
 
-### Bulk enrollment
+### Learner self-enrollment
 
-Instructors can paste or upload a list of email addresses. The result reports each address as:
+```http
+POST /api/courses/{courseId}/enroll
+```
 
-- `Unknown address`
-- `Already-enrolled learner`
-- `Newly enrolled`
+### Learner's enrollments
 
-### Progress export
+```http
+GET /api/enrollments/my
+```
 
-Instructors can export the progress of every learner enrolled in a course as CSV.
+### Course enrollments
 
-## Dashboard
+```http
+GET /api/courses/{courseId}/enrollments
+```
 
-The landing view includes:
+---
 
-- Total learners.
-- Published courses.
-- Completions this month.
-- Learners currently in progress.
-- Enrollment breakdown by course.
-- Enrollment breakdown by progress state.
-- Completion chart for the last eight weeks.
+## Bulk Enrollment
 
-## Activity History
+Instructors can submit a list of learner email addresses:
 
-Each course has an immutable activity log containing:
+```http
+POST /api/courses/{courseId}/enrollments/bulk
+```
 
-- Course creation.
-- Every course edit.
-- Publish transitions.
-- Archive transitions.
-- Comments left by learners or the instructor.
-- Who performed each action.
-- When each action occurred.
+Each address is classified as:
 
-History cannot be edited or deleted after the fact, including by instructors.
+```text
+Unknown
+Already enrolled
+Newly enrolled
+```
+
+The service also validates that the matched account is a learner before creating an enrollment.
+
+---
+
+## Lessons
+
+### List course lessons
+
+```http
+GET /api/courses/{courseId}/lessons
+```
+
+### Create lesson
+
+```http
+POST /api/courses/{courseId}/lessons
+```
+
+### Update lesson
+
+```http
+PUT /api/lessons/{lessonId}
+```
+
+### Delete lesson
+
+```http
+DELETE /api/lessons/{lessonId}
+```
+
+### Reorder lessons
+
+```http
+PUT /api/courses/{courseId}/lessons/reorder
+```
+
+Lessons have a position within their course and are returned in order.
+
+---
+
+## Lesson File Uploads
+
+Lessons support:
+
+```text
+PDF
+PPT
+PPTX
+```
+
+Maximum upload size:
+
+```text
+50 MB per file
+50 MB per request
+```
+
+Files are currently stored in:
+
+```text
+uploads/lessons/
+```
+
+A generated UUID is used for stored filenames, while the database stores the relative application path.
+
+The storage logic is isolated inside:
+
+```text
+FileStorageService
+```
+
+This makes it possible to replace local storage with object storage later without changing the main lesson API.
+
+---
+
+## Progress
+
+### Get enrollment progress
+
+```http
+GET /api/enrollments/{enrollmentId}/progress
+```
+
+### Update progress
+
+```http
+POST /api/enrollments/{enrollmentId}/progress
+```
+
+The backend verifies that the authenticated learner owns the enrollment before allowing progress changes.
+
+---
+
+## Activity History and Comments
+
+### View course activity
+
+```http
+GET /api/courses/{courseId}/activity
+```
+
+### Add a comment
+
+```http
+POST /api/courses/{courseId}/activity/comments
+```
+
+The activity history records important course events such as:
+
+* Course creation
+* Course edits
+* Publishing
+* Archiving
+* Comments
+
+Activity records are treated as immutable history and do not expose update/delete operations.
+
+---
 
 ## Inactivity Alerts
 
-An instructor sees an alert when a learner:
+In-progress learners who have not made further progress for more than 14 days can appear in the instructor's inactivity alerts.
 
-- Is `In Progress` on a course, and
-- Has made no further progress for **more than 14 days**.
+### List alerts
 
-The instructor navigation displays an alert count badge.
+```http
+GET /api/inactivity-alerts
+```
 
-An instructor can dismiss an alert for a specific learner/course combination.
+### Alert count
 
-If the learner subsequently engages and later becomes inactive for more than 14 days again, the alert reappears.
+```http
+GET /api/inactivity-alerts/count
+```
 
-## Tech Stack
+### Dismiss alert
 
-The assignment does not prescribe a technology stack. Use the implementation's actual stack here.
+```http
+POST /api/inactivity-alerts/{id}/dismiss
+```
 
-| Layer | Technology |
-|---|---|
-| Frontend | `<frontend technology>` |
-| Backend | `<backend technology>` |
-| Database | `<database technology>` |
-| ORM / Data access | `<ORM or data access approach>` |
-| Hosting | `<free-tier hosting provider(s)>` |
+A dismissed alert can become active again after the learner makes progress and subsequently becomes inactive again.
+
+---
+
+## Dashboard
+
+The instructor dashboard is available through:
+
+```http
+GET /api/dashboard
+```
+
+It provides:
+
+* Total learners
+* Published courses
+* Completions this month
+* Learners currently in progress
+* Enrollment breakdown by course
+* Progress-state information
+* Weekly completion data
+
+---
+
+## CSV Export
+
+Instructor course progress can be exported through:
+
+```http
+GET /api/courses/{courseId}/export
+```
+
+The response contains the enrolled learners and their progress information as CSV.
+
+---
+
+## Health Check
+
+The application exposes:
+
+```http
+GET /health
+```
+
+The endpoint also checks database connectivity.
+
+A successful response is:
+
+```text
+OK
+```
+
+If the database cannot be reached, the endpoint returns:
+
+```text
+503 Service Unavailable
+```
+
+This endpoint is also used by the deployment keep-alive workflow.
+
+---
+
+# Local Setup
 
 ## Prerequisites
 
-Add the actual prerequisites required by the chosen implementation.
+Install:
 
-```text
-<prerequisites placeholder>
+* Java 21
+* Maven (optional because Maven Wrapper is included)
+* MySQL 8 or another compatible MySQL server
+* Git
+
+Docker can be used instead of running Java directly.
+
+---
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/Rahul-Bhatt-CS/BUSY-Infotech-Project.git
+cd BUSY-Infotech-Project
 ```
 
-## Setup
+---
 
-Clone the public repository and install/configure the project's dependencies according to the selected stack.
+## Database Configuration
 
-```text
-<setup instructions placeholder>
-```
-
-## Environment Variables
-
-Secrets and connection details must not be committed to the repository.
-
-Create the appropriate environment file for the chosen implementation and provide values for the variables required by the application.
-
-Example placeholder:
+The application reads database configuration from environment variables.
 
 ```env
-<ENVIRONMENT_VARIABLE_1>=<value>
-<ENVIRONMENT_VARIABLE_2>=<value>
-<ENVIRONMENT_VARIABLE_3>=<value>
+DB_URL=jdbc:mysql://localhost:3306/learnwithus?createDatabaseIfNotExist=true
+DB_USERNAME=root
+DB_PASSWORD=your_password
 ```
 
-Do not put real credentials, connection strings, API keys, or passwords in this README.
+If these variables are not provided, the application falls back to the local development defaults defined in `application.properties`.
 
-## Running Locally
+---
 
-```text
-<local development command placeholder>
+## JWT Configuration
+
+Set a strong JWT secret through:
+
+```env
+JWT_SECRET=your-secure-secret
 ```
 
-The final README should replace this placeholder with the actual frontend/backend/database startup instructions for the selected stack.
+The secret should be at least 256 bits in production.
 
-## Testing
+JWT expiration is configured in milliseconds:
 
-Add the project's actual test commands here.
-
-```text
-<test command placeholder>
+```env
+JWT_EXPIRATION=86400000
 ```
 
-Testing should cover the mandatory assignment behavior, especially:
+> The current application defines the expiration value in `application.properties`. Keep production secrets outside the repository.
 
-- Server-side role enforcement.
-- Empty-course publication rejection.
-- Course lifecycle transitions.
-- Progress state transitions.
-- Enrollment permissions.
-- Server-side search/filter/sort/pagination behavior.
-- Bulk enrollment result classification.
-- CSV progress export.
-- Dashboard calculations.
-- Immutable activity history.
-- Inactivity alert threshold, dismissal, and reappearance.
+---
 
-## Deployment
+## CORS Configuration
 
-The application must be deployed to a reachable URL using free tiers.
+The backend accepts requests from the configured frontend URL.
 
-Recommended deployment order from the assignment:
+Set:
 
-1. Provision the database.
-2. Give the server its database connection details through environment variables.
-3. Deploy the server and obtain its public URL.
-4. Configure the browser-side application to use the server's public URL.
-5. Seed sufficient demo data.
-6. Verify the live application.
-
-The assignment permits any free hosting arrangement; the suggested database/server/browser providers are examples rather than requirements.
-
-### Live Application
-
-`<deployed application URL>`
-
-### Public GitHub Repository
-
-`<public GitHub repository URL>`
-
-### Free-tier hosting note
-
-If the selected free-tier host sleeps while idle, document the expected wake-up delay here and in `SUBMISSION.md`.
-
-```text
-<hosting behavior placeholder>
+```env
+FRONTEND_URL=http://localhost:5173
 ```
 
-## Demo Credentials
+For production, this should point to the deployed frontend URL.
 
-Provide demo credentials for every required role in `SUBMISSION.md`.
+---
 
-| Role | Email | Password |
-|---|---|---|
-| Instructor | `<demo instructor email>` | `<demo instructor password>` |
-| Learner | `<demo learner email>` | `<demo learner password>` |
+## Run with Maven
 
-Do not commit real production credentials or secrets.
+On Windows:
 
-## Seed / Demo Data
-
-The deployed application must contain enough seeded data to demonstrate the system rather than presenting an empty shell.
-
-Document the actual seed process here:
-
-```text
-<seed instructions placeholder>
+```bash
+mvnw.cmd spring-boot:run
 ```
 
-## Repository Documentation
+On Linux/macOS:
 
-The assignment requires these documents under `docs/`:
+```bash
+./mvnw spring-boot:run
+```
 
-| Document | Purpose |
-|---|---|
-| `docs/architecture.md` | Moving pieces, communication, runtime location, representative request path, and deliberately unbuilt functionality. |
-| `docs/schema.md` | Tables, columns/types, relationships, database/application constraints, denormalization, and expected first bottleneck at 100× data. |
-| `docs/plan.md` | Work sessions, build order, estimates vs. actual time, and cuts made when time was short. |
-| `docs/decisions.md` | At least five real decisions, rejected alternatives, reasons, and at least one later-reversed decision. |
-| `docs/ai-prompts.md` | Actual AI prompts used in order, what they produced, corrections, and a bad-output example; or the no-AI process. |
-
-The repository must also contain a completed `SUBMISSION.md`.
-
-## Git History
-
-The assignment explicitly requires meaningful incremental commits.
-
-Commit work after each meaningful step rather than creating one initial commit containing the finished application. The history is part of the assessment because it demonstrates build order, changes in design, and problem-solving.
-
-## Security and Configuration
-
-- Keep connection strings, keys, and passwords in environment variables.
-- Never commit secrets to the repository.
-- Enforce role permissions on the server.
-- Do not rely on UI hiding as an authorization mechanism.
-
-## Scope
-
-The ten mandatory assignment goals define the completion boundary.
-
-Optional stretch ideas include:
-
-- Quizzes with automatic scoring.
-- Certificates on completion.
-- Discussion threads per lesson.
-- Prerequisite courses.
-- Video lessons with watch-progress tracking.
-- Course ratings and reviews.
-- Learning paths.
-- Downloadable resources per lesson.
-- Email digest of inactive learners.
-
-These are optional and do not replace any mandatory goal.
-
-## Assignment Submission
-
-The final submission consists of:
-
-- Public GitHub repository URL.
-- Live deployed application URL.
-- Completed `SUBMISSION.md`.
-
-`SUBMISSION.md` should also contain:
-
-- Reviewer notes.
-- Demo credentials for every role.
-- Actual stack.
-- Honest status of all ten goals.
-- Actual time spent.
-- What would be done next with another 12 hours.
-- The least satisfactory part of the codebase and why.
-
-## Development Status
+The server starts on:
 
 ```text
-<project status placeholder>
+http://localhost:8080
+```
+
+The port can be changed with:
+
+```env
+PORT=8080
+```
+
+---
+
+## Build
+
+```bash
+./mvnw clean package
+```
+
+On Windows:
+
+```bash
+mvnw.cmd clean package
+```
+
+The generated JAR is placed under:
+
+```text
+target/
+```
+
+---
+
+## Run the JAR
+
+```bash
+java -jar target/learnWithUs-0.0.1-SNAPSHOT.jar
+```
+
+---
+
+# Docker
+
+The project includes a multi-stage Dockerfile using Java 21.
+
+Build:
+
+```bash
+docker build -t learnwithus-backend .
+```
+
+Run:
+
+```bash
+docker run -p 8080:8080 \
+  -e DB_URL="your-database-url" \
+  -e DB_USERNAME="your-database-user" \
+  -e DB_PASSWORD="your-database-password" \
+  -e JWT_SECRET="your-jwt-secret" \
+  -e FRONTEND_URL="http://localhost:5173" \
+  learnwithus-backend
+```
+
+The container exposes port:
+
+```text
+8080
+```
+
+In deployment environments such as Render, the application uses the platform-provided `PORT` value automatically.
+
+---
+
+# Demo Users
+
+The application seeds demo users when it starts.
+
+### Instructor
+
+```text
+Email:    instructor@learnwithus.com
+Password: Instructor@123
+Role:     INSTRUCTOR
+```
+
+### Learner
+
+```text
+Email:    learner@learnwithus.com
+Password: Learner@123
+Role:     LEARNER
+```
+
+Additional learner accounts are also seeded:
+
+```text
+learner1@learnwithus.com
+learner2@learnwithus.com
+learner3@learnwithus.com
+...
+learner9@learnwithus.com
+```
+
+All use:
+
+```text
+Learner@123
+```
+
+The seeder checks whether each email already exists before creating the account, so restarting the application does not create duplicate users.
+
+---
+
+# Configuration
+
+Important application properties include:
+
+| Variable             | Purpose                       |
+| -------------------- | ----------------------------- |
+| `PORT`               | Server port                   |
+| `DB_URL`             | MySQL JDBC URL                |
+| `DB_USERNAME`        | Database username             |
+| `DB_PASSWORD`        | Database password             |
+| `JWT_SECRET`         | JWT signing secret            |
+| `FRONTEND_URL`       | Allowed frontend origin       |
+| `SHOW_SQL`           | Enable SQL logging            |
+| `FORMAT_SQL`         | Format Hibernate SQL          |
+| `SECURITY_LOG_LEVEL` | Spring Security logging level |
+
+File upload limits are currently:
+
+```text
+Max file size:    50 MB
+Max request size: 50 MB
+```
+
+---
+
+# Production Deployment
+
+The current application is deployed using:
+
+```text
+Frontend → Vercel
+Backend  → Render
+Database → Aiven MySQL
+```
+
+The backend is packaged as a Docker container and deployed to Render.
+
+The production backend health endpoint is:
+
+```text
+https://busy-infotech-project.onrender.com/health
+```
+
+The frontend communicates with the backend through the deployed API URL.
+
+---
+
+## Aiven Database Note
+
+The Aiven MySQL instance may occasionally become unavailable and require a manual restart.
+
+If the application continues returning database errors after waiting for some time, the database should be checked/restarted before treating the backend itself as unavailable.
+
+---
+
+# API Documentation
+
+The complete API specification is maintained separately in:
+
+```text
+api-spec.md
+```
+
+It documents the API endpoints, request/response structures and expected behavior.
+
+---
+
+# Design Documentation
+
+The repository also contains design and development documentation:
+
+```text
+docs/
+├── architecture.md
+├── schema.md
+├── plan.md
+├── decisions.md
+└── ai-prompts.md
+```
+
+These documents explain the architecture, database design, development process, technical decisions and AI-assisted development process.
+
+---
+
+# Development Approach
+
+The backend was built incrementally rather than as one large implementation.
+
+The main progression was:
+
+```text
+Project setup
+      ↓
+Schema and entities
+      ↓
+JWT security
+      ↓
+Course APIs
+      ↓
+Business logic
+      ↓
+Role authorization
+      ↓
+Lessons and files
+      ↓
+Enrollment and bulk enrollment
+      ↓
+Dashboard / activity / alerts
+      ↓
+Deployment
+      ↓
+Bug fixes and deployment reliability
+```
+
+The Git history contains the individual implementation and debugging steps.
+
+---
+
+# Current Limitations
+
+The current implementation is intentionally focused on the assignment requirements.
+
+Some areas that could be improved for a larger production system include:
+
+* Replacing local lesson-file storage with object storage.
+* Removing remaining N+1 database query patterns.
+* Adding pagination to currently unbounded history/enrollment responses.
+* More extensive automated tests.
+* Batch processing for very large bulk-enrollment requests.
+* Full-text search for a much larger course catalogue.
+* More comprehensive monitoring and observability.
+
+These are documented in more detail in `docs/schema.md` and `docs/decisions.md`.
+
+---
+
+# Related Repository
+
+Frontend:
+
+```text
+https://github.com/Rahul-Bhatt-CS/BUSY-Infotech-Project-Frontend
+```
+
+Live application:
+
+```text
+https://busy-infotech-project-frontend.vercel.app/
+```
+
+Backend:
+
+```text
+https://github.com/Rahul-Bhatt-CS/BUSY-Infotech-Project
 ```
